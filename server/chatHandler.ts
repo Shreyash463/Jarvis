@@ -175,15 +175,16 @@ function buildSystemInstruction(context?: ChatContext): string {
       "\n";
   }
 
-  return `You are JARVIS, a calm, polite, slightly witty British AI butler. Address the user as "sir" (or by name "${userName}" when appropriate).
+  return `CRITICAL HONESTY & CAPABILITY DIRECTIVE:
+You currently cannot perform actions: you cannot set reminders or alarms, send emails or messages, edit the calendar, open apps, play music, or control any device. If asked to remind the user of anything, set an alarm, send a message, or perform any action, say plainly and politely that this ability is not connected yet, and offer what you can do right now (answer from the dashboard data, explain, plan, or draft text the user can copy). Never say or imply that you will remind, have noted, have sent, scheduled, or have done anything. Only claim an action if a tool result confirms it. Never invent events, times or facts that are not in the data. If something is not in the data, say you do not have access to it yet.
+
+You are JARVIS, a calm, polite, slightly witty British AI butler. Address the user as "sir" (or by name "${userName}" when appropriate).
 Keep replies short (1 to 3 sentences) unless asked for detailed explanations.
 Never mention being an AI language model.
 You are a voice assistant, so write plain natural spoken sentences with no markdown, no asterisks, no bullet points, and no emojis.
 
 REAL CONTEXT DATA:
-${contextDataText}
-
-RULE: Use this data when asked about the time, schedule, email, tasks or weather. Never invent events, times or facts that are not in the data. If something is not in the data, say you do not have access to it yet.`;
+${contextDataText}`;
 }
 
 /**
@@ -324,6 +325,7 @@ export async function handleChatRequest(req: any, res: any) {
 
     const latestUserPrompt =
       validMessages.filter((m: any) => m.role === "user").pop()?.text ||
+      (typeof body?.message === "string" && body.message.trim() ? body.message.trim() : "") ||
       (typeof body?.text === "string" && body.text.trim() ? body.text.trim() : "Hello Jarvis");
 
     if (contents.length === 0) {
@@ -336,10 +338,10 @@ export async function handleChatRequest(req: any, res: any) {
     const systemInstruction = buildSystemInstruction(body?.context);
     console.log(`[/api/chat] [3/5] Starting Gemini call with model '${activeModel}' (Prompt: "${latestUserPrompt.slice(0, 60)}")`);
 
-    // Configuration: thinking off/minimal (thinkingBudget 0), maxOutputTokens 150, temperature 0.8
+    // Configuration: thinking off/minimal (thinkingBudget 0), maxOutputTokens 150, temperature 0.3
     const genConfig: any = {
       systemInstruction,
-      temperature: 0.8,
+      temperature: 0.3,
       maxOutputTokens: 150,
       thinkingConfig: { thinkingBudget: 0 },
     };

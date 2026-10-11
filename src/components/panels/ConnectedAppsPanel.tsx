@@ -79,7 +79,7 @@ export const ConnectedAppsPanel: React.FC<ConnectedAppsPanelProps> = ({ connecto
 
               {/* Tooltip on hover */}
               {hoveredApp === app.id && (
-                <div className="pointer-events-none absolute -top-8 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.15] bg-[#070e1c]/95 px-2 py-0.5 font-['Inter'] text-[10px] text-white/90 shadow-[0_8px_20px_rgba(0,0,0,0.6)] backdrop-blur-md">
+                <div className="pointer-events-none absolute -top-8 left-1/2 z-40 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/[0.18] bg-[#071322]/90 px-2.5 py-0.5 font-['Inter'] text-[10px] text-white/90 shadow-[0_8px_20px_rgba(0,0,0,0.5)] backdrop-blur-md">
                   <span>{app.name}</span>
                 </div>
               )}

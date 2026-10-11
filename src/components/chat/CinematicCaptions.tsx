@@ -44,11 +44,7 @@ export const CinematicCaptions: React.FC<CinematicCaptionsProps> = ({
 
   if (!hasContent || !visible) {
     return (
-      <div className="h-20 flex items-center justify-center pointer-events-none select-none transition-opacity duration-200 opacity-60">
-        <span className="font-['Orbitron'] text-xs tracking-[0.25em] text-white/30 uppercase">
-          STANDBY
-        </span>
-      </div>
+      <div className="h-20 flex items-center justify-center pointer-events-none select-none transition-opacity duration-200 opacity-0" />
     );
   }
 

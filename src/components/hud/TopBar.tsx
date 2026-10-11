@@ -4,6 +4,7 @@ import { useClock } from "../../hooks/useClock";
 import { useJarvisStore } from "../../store/jarvisStore";
 import { ORB_CAPTIONS } from "../../utils/personality";
 import { USE_MOCK, MOCK_TOOLS } from "../../config";
+import { GlassTooltip } from "../common/GlassTooltip";
 
 interface TopBarProps {
   onOpenSchedule?: () => void;
@@ -74,14 +75,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenHistory }) => {
         </div>
       </div>
 
-      {/* CENTER: Small glass pill showing connection dot + current state word */}
-      <div className="flex items-center">
-        <div className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] backdrop-blur-[20px] px-3.5 py-1 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
-          <span className={`h-1.5 w-1.5 rounded-full ${getConnectionDot()}`} />
-          <span className="font-['Orbitron'] text-[10px] font-medium tracking-[0.2em] text-[#7be8ff]/90 uppercase">
-            {currentCaption}
-          </span>
-        </div>
+      {/* CENTER: Status Pill and Tap to go Live button */}
+      <div className="flex items-center gap-2">
+        <GlassTooltip content="Live Voice Status">
+          <div className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] backdrop-blur-[20px] px-3.5 py-1 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+            <span className={`h-1.5 w-1.5 rounded-full ${getConnectionDot()}`} />
+            <span className="font-['Orbitron'] text-[10px] font-medium tracking-[0.2em] text-[#7be8ff]/90 uppercase">
+              {currentCaption}
+            </span>
+          </div>
+        </GlassTooltip>
       </div>
 
       {/* RIGHT: Clock (HH:MM large thin, seconds small), date below, settings and fullscreen glass buttons */}
@@ -121,33 +124,36 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenHistory }) => {
         {/* Small Round Glass Buttons */}
         <div className="flex items-center gap-1.5">
           {onOpenHistory && (
-            <button
-              onClick={onOpenHistory}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
-              aria-label="Conversation History"
-              title="Conversation History"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-            </button>
+            <GlassTooltip content="Conversation History">
+              <button
+                onClick={onOpenHistory}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
+                aria-label="Conversation History"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+              </button>
+            </GlassTooltip>
           )}
 
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
-            aria-label="Settings"
-            title="System Settings"
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
+          <GlassTooltip content="System Settings">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
+              aria-label="Settings"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          </GlassTooltip>
 
-          <button
-            onClick={toggleFullscreen}
-            className="hidden sm:flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
-            aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-            title="Toggle Fullscreen"
-          >
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </button>
+          <GlassTooltip content={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
+            <button
+              onClick={toggleFullscreen}
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.05] text-white/70 hover:border-white/[0.25] hover:bg-white/[0.12] hover:text-[#7be8ff] transition-all active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.2)]"
+              aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </button>
+          </GlassTooltip>
         </div>
       </div>
     </header>

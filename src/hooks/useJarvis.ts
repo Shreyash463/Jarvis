@@ -1,15 +1,16 @@
 /**
  * J.A.R.V.I.S Orchestration Hook
- * Bridges the decoupled JarvisApi service, real Web Speech voice input,
- * and sentence-by-sentence streaming speech synthesis with the Zustand UI state.
+ * Bridges Gemini Live API (default) with Classic Web Speech fallback
+ * and the Zustand HUD UI state.
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { jarvisApi } from "../services/jarvisApi";
 import { useJarvisStore } from "../store/jarvisStore";
 import { soundFx } from "../utils/audioSynth";
 import { speechService } from "../utils/speechSynthesisService";
 import { speechInput } from "../utils/speechRecognitionService";
+import { geminiLiveService } from "../services/geminiLiveService";
 
 export function useJarvis() {
   const {
@@ -38,7 +39,11 @@ export function useJarvis() {
     setActiveConfirmation,
     setMessages,
     addToast,
+    updateSettings,
   } = useJarvisStore();
+
+  const isLiveMode = (settings.voice?.voiceEngine || "live") === "live";
+  const liveTurnMsgIdRef = useRef<string | null>(null);
 
   // Sync soundFx config with settings
   useEffect(() => {
@@ -46,14 +51,14 @@ export function useJarvis() {
     soundFx.setVolume(settings.sound.volume);
   }, [settings.sound.sfxEnabled, settings.sound.volume]);
 
-  // Sync speech synthesis and recognition settings
+  // Sync speech synthesis and recognition settings for Classic engine
   useEffect(() => {
     speechService.setRate(settings.voice.speechRate);
     speechService.setVoiceName(settings.voice.selectedVoice);
-    speechService.setVoiceEngine(settings.voice.voiceEngine || "browser");
+    speechService.setVoiceEngine(settings.voice.voiceEngine === "browser" ? "browser" : "gemini");
     speechService.setMuted(isVoiceMuted);
     speechInput.setSpeechEngine(settings.voice.speechEngine || "browser");
-    speechService.setEffectAmount(settings.voice.effectAmount ?? 40);
+    speechService.setEffectAmount(settings.voice.effectAmount ?? 30);
   }, [
     settings.voice.speechRate,
     settings.voice.selectedVoice,
@@ -63,25 +68,34 @@ export function useJarvis() {
     isVoiceMuted,
   ]);
 
+  // Sync Gemini Live service settings
+  useEffect(() => {
+    geminiLiveService.setVoiceName(settings.voice?.liveVoice || "Charon");
+    geminiLiveService.setEffectAmount(settings.voice?.effectAmount ?? 30);
+  }, [settings.voice?.liveVoice, settings.voice?.effectAmount]);
+
   // Continuously drive real audio level into orb and voice ring
   useEffect(() => {
     let animId: number;
     const tick = () => {
-      if (orbState === "speaking") {
-        setAudioLevel(speechService.getAudioLevel());
-      } else if (orbState === "listening") {
-        setAudioLevel(speechInput.getAudioLevel());
-      } else {
-        setAudioLevel(0);
+      if (!isLiveMode) {
+        if (orbState === "speaking") {
+          setAudioLevel(speechService.getAudioLevel());
+        } else if (orbState === "listening") {
+          setAudioLevel(speechInput.getAudioLevel());
+        } else {
+          setAudioLevel(0);
+        }
       }
       animId = requestAnimationFrame(tick);
     };
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, [orbState, setAudioLevel]);
+  }, [isLiveMode, orbState, setAudioLevel]);
 
-  // Hook speech synthesis state to orb animation
+  // Hook Classic speech synthesis state to orb animation
   useEffect(() => {
+    if (isLiveMode) return;
     speechService.onSpeakingChange((speaking) => {
       if (speaking) {
         setOrbState("speaking");
@@ -89,49 +103,113 @@ export function useJarvis() {
         setOrbState("idle");
       }
     });
-  }, [setOrbState]);
+  }, [isLiveMode, setOrbState]);
 
-  // Connect service and listen for events
+  // Setup Gemini Live Callbacks
+  useEffect(() => {
+    geminiLiveService.setCallbacks({
+      onStateChange: (state) => {
+        setOrbState(state);
+      },
+      onAudioLevel: (level) => {
+        setAudioLevel(level);
+      },
+      onUserTranscript: (text) => {
+        setPartialTranscript(text);
+      },
+      onAssistantTranscript: (delta, fullText) => {
+        if (!liveTurnMsgIdRef.current) {
+          liveTurnMsgIdRef.current = `asst-live-${Date.now()}`;
+        }
+        updateAssistantDelta(liveTurnMsgIdRef.current, delta);
+      },
+      onTurnComplete: (userText, assistantText) => {
+        if (userText) {
+          addUserMessage(userText);
+        }
+        if (liveTurnMsgIdRef.current) {
+          finishAssistantMessage(liveTurnMsgIdRef.current);
+          liveTurnMsgIdRef.current = null;
+        } else if (assistantText) {
+          const id = `asst-live-${Date.now()}`;
+          updateAssistantDelta(id, assistantText);
+          finishAssistantMessage(id);
+        }
+      },
+      onInterrupted: () => {
+        if (liveTurnMsgIdRef.current) {
+          finishAssistantMessage(liveTurnMsgIdRef.current);
+          liveTurnMsgIdRef.current = null;
+        }
+        setOrbState("listening");
+      },
+      onError: (errMsg) => {
+        addToast({
+          type: "error",
+          title: "Gemini Live Warning",
+          message: `${errMsg} Offering Classic engine fallback.`,
+        });
+        setOrbState("error");
+      },
+      onLatencyMeasured: (ms) => {
+        setStats({
+          ...stats,
+          latency: ms,
+        });
+      },
+      onConnectedChange: (connected) => {
+        setConnection(connected ? "connected" : "idle");
+      },
+    });
+  }, [
+    setOrbState,
+    setAudioLevel,
+    setPartialTranscript,
+    updateAssistantDelta,
+    finishAssistantMessage,
+    addUserMessage,
+    addToast,
+    setStats,
+    stats,
+    setConnection,
+  ]);
+
+  // Connect Classic service and listen for background events
   useEffect(() => {
     const unsubscribe = jarvisApi.subscribe((event) => {
       switch (event.type) {
         case "connection":
-          setConnection(event.status);
-          if (event.status === "connected") {
-            addToast({
-              type: "success",
-              title: "HUD Online",
-              message: "Secure telemetry link established.",
-            });
-          } else if (event.status === "disconnected") {
-            addToast({
-              type: "error",
-              title: "Link Severed",
-              message: "Tactical connection dropped.",
-            });
+          if (!isLiveMode) {
+            setConnection(event.status);
           }
           break;
 
         case "orb_state":
-          // Only update orb state from server if TTS is not currently playing audio
-          if (!speechService.isCurrentlySpeaking() || event.state === "error" || event.state === "offline") {
-            setOrbState(event.state);
+          if (!isLiveMode) {
+            if (!speechService.isCurrentlySpeaking() || event.state === "error" || event.state === "offline") {
+              setOrbState(event.state);
+            }
           }
           break;
 
         case "transcript_partial":
-          setPartialTranscript(event.text);
+          if (!isLiveMode) {
+            setPartialTranscript(event.text);
+          }
           break;
 
         case "assistant_delta":
-          updateAssistantDelta(event.messageId, event.delta);
-          // Stream delta to speech synthesis
-          speechService.appendDelta(event.delta);
+          if (!isLiveMode) {
+            updateAssistantDelta(event.messageId, event.delta);
+            speechService.appendDelta(event.delta);
+          }
           break;
 
         case "assistant_done":
-          finishAssistantMessage(event.messageId);
-          speechService.finishStream();
+          if (!isLiveMode) {
+            finishAssistantMessage(event.messageId);
+            speechService.finishStream();
+          }
           break;
 
         case "tool_call":
@@ -180,8 +258,10 @@ export function useJarvis() {
       unsubscribe();
       speechService.cancel();
       speechInput.cancel();
+      geminiLiveService.stopLive();
     };
   }, [
+    isLiveMode,
     setConnection,
     setOrbState,
     setPartialTranscript,
@@ -198,17 +278,48 @@ export function useJarvis() {
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
-      // Interrupt any current speech playback
+
+      if (isLiveMode && geminiLiveService.isActive()) {
+        // Feed directly into Gemini Live session
+        soundFx.playSendBlip();
+        geminiLiveService.sendTextMessage(text);
+        return;
+      }
+
+      // Classic route
       speechService.cancel();
       soundFx.playSendBlip();
       addUserMessage(text);
       await jarvisApi.sendMessage(text);
     },
-    [addUserMessage]
+    [isLiveMode, addUserMessage]
   );
 
   const startListening = useCallback(async () => {
-    // Interrupt any ongoing speech output
+    if (isLiveMode) {
+      try {
+        soundFx.playListenStart();
+        await geminiLiveService.startLive(dashboard, settings);
+        addToast({
+          type: "success",
+          title: "Gemini Live Active",
+          message: `Connected to ${settings.voice?.liveVoice || "Charon"} voice pipeline.`,
+        });
+      } catch (err: any) {
+        addToast({
+          type: "warning",
+          title: "Live Unavailable",
+          message: `${err?.message || "Microphone permission denied"}. Switching to Classic engine.`,
+        });
+        updateSettings((prev) => ({
+          ...prev,
+          voice: { ...prev.voice, voiceEngine: "browser" },
+        }));
+      }
+      return;
+    }
+
+    // Classic Web Speech engine
     speechService.cancel();
     soundFx.playListenStart();
 
@@ -246,14 +357,20 @@ export function useJarvis() {
         setPartialTranscript("");
       },
     });
-  }, [sendMessage, setOrbState, setPartialTranscript, addToast]);
+  }, [isLiveMode, dashboard, settings, addToast, updateSettings, sendMessage, setOrbState, setPartialTranscript]);
 
   const stopListening = useCallback(async () => {
+    if (isLiveMode) {
+      geminiLiveService.stopLive();
+      setOrbState("idle");
+      return;
+    }
+
     speechInput.stop();
     setPartialTranscript("");
     setOrbState("idle");
     await jarvisApi.stopListening();
-  }, [setOrbState, setPartialTranscript]);
+  }, [isLiveMode, setOrbState, setPartialTranscript]);
 
   const confirmAction = useCallback(
     async (confirmationId: string, approved: boolean) => {
@@ -267,6 +384,11 @@ export function useJarvis() {
   );
 
   const cancelCurrentTask = useCallback(async () => {
+    if (isLiveMode && geminiLiveService.isActive()) {
+      geminiLiveService.interruptPlayback();
+      return;
+    }
+
     speechService.cancel();
     speechInput.cancel();
     await jarvisApi.cancelCurrentTask();
@@ -276,12 +398,16 @@ export function useJarvis() {
       title: "Task Cancelled",
       message: "Current directive cancelled by user.",
     });
-  }, [setActiveConfirmation, addToast]);
+  }, [isLiveMode, setActiveConfirmation, addToast]);
 
   const toggleVoiceMute = useCallback(() => {
     setVoiceMuted(!isVoiceMuted);
     if (!isVoiceMuted) {
-      speechService.cancel();
+      if (isLiveMode) {
+        geminiLiveService.interruptPlayback();
+      } else {
+        speechService.cancel();
+      }
       addToast({
         type: "info",
         title: "Voice Output",
@@ -294,7 +420,7 @@ export function useJarvis() {
         message: "Voice output enabled.",
       });
     }
-  }, [isVoiceMuted, setVoiceMuted, addToast]);
+  }, [isLiveMode, isVoiceMuted, setVoiceMuted, addToast]);
 
   return {
     connection,

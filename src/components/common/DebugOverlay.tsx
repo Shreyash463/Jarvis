@@ -6,9 +6,12 @@ import { useJarvisStore } from "../../store/jarvisStore";
 interface DebugStats {
   sendToFirstTokenMs: number | null;
   firstTokenToFirstAudioMs: number | null;
+  speechEndToAudioMs?: number | null;
   totalTimeMs: number | null;
   speechEngine: string;
   voiceEngine: string;
+  liveVoiceName?: string;
+  sessionState?: string;
   lastError: string | null;
 }
 
@@ -115,6 +118,13 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({ stats, visible, onCl
             </button>
           </div>
 
+          {stats.speechEndToAudioMs !== undefined && stats.speechEndToAudioMs !== null && (
+            <div className="flex justify-between bg-cyan-950/30 p-1 rounded border border-cyan-500/20">
+              <span className="text-[#7be8ff] font-medium">Speech-End → Audio:</span>
+              <span className="text-[#7be8ff] font-bold">{stats.speechEndToAudioMs}ms</span>
+            </div>
+          )}
+
           <div className="flex justify-between">
             <span className="text-white/45">Send → 1st Token:</span>
             <span className="text-[#7be8ff]">
@@ -130,21 +140,21 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({ stats, visible, onCl
           </div>
 
           <div className="flex justify-between">
-            <span className="text-white/45">Total Turnaround:</span>
-            <span className="text-white font-medium">
-              {stats.totalTimeMs !== null ? `${stats.totalTimeMs}ms` : "--"}
-            </span>
+            <span className="text-white/45">Session State:</span>
+            <span className="text-[#7be8ff] font-semibold">{stats.sessionState || currentOrbState}</span>
           </div>
 
           <div className="flex justify-between pt-1 border-t border-white/10">
-            <span className="text-white/45">Speech (ASR):</span>
-            <span className="text-white/90">{stats.speechEngine}</span>
-          </div>
-
-          <div className="flex justify-between">
-            <span className="text-white/45">Voice (TTS):</span>
+            <span className="text-white/45">Voice Engine:</span>
             <span className="text-white/90">{stats.voiceEngine}</span>
           </div>
+
+          {stats.liveVoiceName && (
+            <div className="flex justify-between">
+              <span className="text-white/45">Live Voice:</span>
+              <span className="text-cyan-300 font-medium">{stats.liveVoiceName}</span>
+            </div>
+          )}
 
           {stats.lastError && (
             <div className="pt-1.5 mt-1 border-t border-rose-500/30 text-rose-300 text-[11px] break-words">

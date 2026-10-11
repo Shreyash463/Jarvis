@@ -27,8 +27,9 @@ const DEFAULT_SETTINGS: UserSettings = {
     speechRate: 1.0,
     wakeWordEnabled: false,
     speechEngine: "browser",
-    voiceEngine: "gemini",
-    effectAmount: 40,
+    voiceEngine: "live",
+    liveVoice: "Charon",
+    effectAmount: 30,
     isMuted: false,
   },
   hearing: {

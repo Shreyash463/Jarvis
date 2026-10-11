@@ -71,8 +71,10 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     document.documentElement.style.setProperty("--cyan-soft", accent.soft);
   };
 
-  const handleVoiceEngineChange = (engine: "gemini" | "browser") => {
-    speechService.setVoiceEngine(engine);
+  const handleVoiceEngineChange = (engine: "live" | "browser" | "gemini") => {
+    if (engine !== "live") {
+      speechService.setVoiceEngine(engine as any);
+    }
     updateSettings((prev) => ({
       ...prev,
       voice: { ...prev.voice, voiceEngine: engine },
@@ -157,15 +159,15 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleVoiceEngineChange("gemini")}
+                    onClick={() => handleVoiceEngineChange("live")}
                     className={`rounded-xl border py-2 px-3 text-xs font-medium text-left transition-all ${
-                      settings.voice?.voiceEngine === "gemini"
+                      (settings.voice?.voiceEngine || "live") === "live"
                         ? "border-[#7be8ff]/70 bg-[#7be8ff]/15 text-[#7be8ff] shadow-[0_0_12px_rgba(123,232,255,0.2)]"
                         : "border-white/[0.1] bg-white/[0.03] text-white/65 hover:border-white/[0.2]"
                     }`}
                   >
-                    <div className="font-semibold">Cinematic Gemini</div>
-                    <div className="text-[10px] text-white/45 mt-0.5">Natural British AI (Default)</div>
+                    <div className="font-semibold">Gemini Live (default)</div>
+                    <div className="text-[10px] text-white/45 mt-0.5">Real-time bi-directional audio</div>
                   </button>
                   <button
                     type="button"
@@ -176,11 +178,44 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                         : "border-white/[0.1] bg-white/[0.03] text-white/65 hover:border-white/[0.2]"
                     }`}
                   >
-                    <div className="font-semibold">Browser voice</div>
-                    <div className="text-[10px] text-white/45 mt-0.5">Instant local playback</div>
+                    <div className="font-semibold">Classic (browser speech)</div>
+                    <div className="text-[10px] text-white/45 mt-0.5">Standard speech fallback</div>
                   </button>
                 </div>
               </div>
+
+              {/* Gemini Live Prebuilt Voice Picker */}
+              {(settings.voice?.voiceEngine || "live") === "live" && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-white/60">Live Voice Persona</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "Charon", label: "Charon", desc: "Deep, calm British" },
+                      { id: "Orus", label: "Orus", desc: "Crisp & authoritative" },
+                      { id: "Fenrir", label: "Fenrir", desc: "Warm & resonant" },
+                    ].map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() =>
+                          updateSettings((prev) => ({
+                            ...prev,
+                            voice: { ...prev.voice, liveVoice: v.id as any },
+                          }))
+                        }
+                        className={`rounded-xl border p-2 text-xs font-medium text-left transition-all ${
+                          (settings.voice?.liveVoice || "Charon") === v.id
+                            ? "border-[#7be8ff]/70 bg-[#7be8ff]/15 text-[#7be8ff]"
+                            : "border-white/[0.1] bg-white/[0.03] text-white/65 hover:border-white/[0.2]"
+                        }`}
+                      >
+                        <div className="font-semibold">{v.label}</div>
+                        <div className="text-[9px] text-white/45">{v.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Browser Voice Dropdown (preferred male English) */}
               {settings.voice?.voiceEngine === "browser" && (

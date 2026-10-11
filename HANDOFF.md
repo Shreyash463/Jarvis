@@ -4,176 +4,114 @@ This document outlines the architecture, service boundaries, data schemas, endpo
 
 ---
 
-## 1. Directory Structure & Ownership
+## 1. Directory Structure & Architecture
 
 ```
 /
 ├── server/
-│   ├── index.ts                 # Server entry point mounting /api/health, /api/chat, /api/transcribe, /api/tts
-│   ├── chatHandler.ts           # Gemini 3.8 Flash streaming SSE handler with context injection
-│   ├── transcribeHandler.ts     # Gemini 3.5 Transcribe audio recording endpoint
-│   └── ttsHandler.ts            # Gemini 3.8 Flash Lite TTS speech synthesis endpoint
+│   ├── index.ts                 # Server entry point mounting HTTP & Live WebSocket
+│   ├── liveProxy.ts             # Bidirectional WebSocket bridge to Gemini Live (gemini-3.8-live)
+│   ├── chatHandler.ts           # Gemini Flash streaming SSE handler with context injection & honesty rule
+│   ├── transcribeHandler.ts     # Gemini Transcribe audio recording endpoint
+│   └── ttsHandler.ts            # Gemini Flash Lite TTS speech synthesis endpoint
+├── public/
+│   └── pcm-recorder-processor.js# AudioWorklet processor for downsampling microphone to 16 kHz 16-bit PCM
 ├── src/
 │   ├── components/
 │   │   ├── common/
-│   │   │   ├── GlassCard.tsx        # Modern frosted glass card material with sheen and glow
-│   │   │   ├── DebugOverlay.tsx     # Live D-key latency telemetry chip (TTFT, TTS latency, engines)
-│   │   │   └── ToastContainer.tsx   # Floating alert notifications
+│   │   │   ├── GlassCard.tsx        # Frosted glass card material with sheen and border glow
+│   │   │   ├── GlassTooltip.tsx     # Custom glass pill tooltip (no black boxes or nested backdrop bugs)
+│   │   │   ├── DebugOverlay.tsx     # Live D-key latency telemetry chip (Live Speech-End-to-Audio, voice, session)
+│   │   │   └── ToastContainer.tsx   # Floating HUD alert notifications
 │   │   ├── hud/
-│   │   │   ├── BackgroundHud.tsx    # 3 drifting gradient blobs, range-finder HUD rings, vignette
-│   │   │   └── TopBar.tsx           # Transparent bar: Logo, connection pill, clock, settings, history
+│   │   │   ├── BackgroundHud.tsx    # Drifting gradient blobs, range-finder HUD rings, vignette
+│   │   │   └── TopBar.tsx           # Status pill, thin digital clock, settings and history triggers
 │   │   ├── orb/
-│   │   │   └── ArcReactorOrb.tsx    # Hero Arc Reactor core canvas: min(46vh, 520px)
+│   │   │   └── ArcReactorOrb.tsx    # Hero Arc Reactor core canvas with permanent 7-state render loop
 │   │   ├── chat/
-│   │   │   ├── CinematicCaptions.tsx# Subtitles directly under orb: live user speech & elegant subtitles
-│   │   │   └── CommandDock.tsx      # Integrated floating dock: mic, input, send, mute, and abort
+│   │   │   ├── CinematicCaptions.tsx# Clean turn-based subtitles directly under the orb
+│   │   │   └── CommandDock.tsx      # Integrated floating dock: mic, text input, send, mute, and abort
 │   │   ├── panels/
 │   │   │   ├── SystemVitalsPanel.tsx # 3 thin ring gauges (CPU, RAM, DISK) + network line
 │   │   │   ├── ConnectedAppsPanel.tsx# 4x2 grid of round glass icon buttons with tooltips
-│   │   │   ├── WeatherPanel.tsx     # Large thin temperature, condition, city, icon
-│   │   │   ├── SchedulePanel.tsx    # Next up appointment card with time progress and drawer trigger
-│   │   │   ├── InboxPanel.tsx       # Unread count and latest sender + subject
-│   │   │   ├── TasksPanel.tsx       # 1 of 4 done progress bar and next 2 tasks
+│   │   │   ├── WeatherPanel.tsx     # Current temperature, condition, humidity, wind
+│   │   │   ├── SchedulePanel.tsx    # Calendar agenda card with next event countdown
+│   │   │   ├── InboxPanel.tsx       # Unread email count & latest sender snippet
+│   │   │   ├── TasksPanel.tsx       # Task checklist with interactive checkboxes
 │   │   │   └── ActivityLogPanel.tsx # Live tool directive execution feed
 │   │   └── overlays/
-│   │       ├── BootSequence.tsx     # Neural interface initialization screen
-│   │       ├── ConfirmationModal.tsx# Centered authorization modal with 1s hold-to-approve
-│   │       ├── CommandPalette.tsx   # Ctrl+K / Cmd+K searchable command overlay
-│   │       ├── SettingsDrawer.tsx   # User profile, voice engines, accents, and safety rules
+│   │       ├── SettingsDrawer.tsx   # Voice engine picker (Gemini Live default vs Classic), voice persona
 │   │       ├── HistoryDrawer.tsx    # Slide-over full conversation history transcript
-│   │       ├── ScheduleDrawer.tsx   # Full daily agenda modal
-│   │       ├── InboxDrawer.tsx      # Full email inbox modal
-│   │       ├── ActivityDrawer.tsx   # Full activity log modal
-│   │       └── MobilePanelsSheet.tsx# Bottom drawer for responsive viewports
-│   ├── config.ts                # Application configuration & flags
+│   │       ├── CommandPalette.tsx   # Ctrl+K command search
+│   │       └── ConfirmationModal.tsx# Security authorization modal with hold-to-approve
 │   ├── hooks/
-│   │   ├── useAudioLevel.ts     # Real Web Audio AnalyserNode with simulation fallback
-│   │   ├── useClock.ts          # Live digital clock and formatted date
-│   │   ├── useHotkeys.ts        # Space push-to-talk, Ctrl+K commands, Esc cancel, D debug
-│   │   └── useJarvis.ts         # Service bus bridge connecting JarvisApi to the UI store
-│   ├── pages/
-│   │   └── JarvisPage.tsx       # Primary HUD page layout
+│   │   ├── useJarvis.ts         # Orchestration hook uniting Gemini Live and Classic engines
+│   │   ├── useClock.ts          # Live digital clock (HH:MM:SS) in Asia/Kolkata
+│   │   └── useHotkeys.ts        # Keyboard shortcuts (Space push-to-talk, Esc abort, D telemetry)
 │   ├── services/
+│   │   ├── geminiLiveService.ts # Real-time Gemini Live Web Audio client with barge-in interruption
 │   │   ├── jarvisApi.ts         # Service gateway contract
-│   │   └── mockJarvisApi.ts     # Asynchronous engine with 10s timeout, 1x retry, context injection
-│   ├── store/
-│   │   └── jarvisStore.ts       # Zustand store with UserSettings persistence
-│   ├── types/
-│   │   └── index.ts             # Canonical TypeScript definitions
-│   └── utils/
-│       ├── audioSynth.ts        # Synthesized Web Audio API sound effects
-│       ├── speechRecognitionService.ts # Dual ASR (Web Speech API + Gemini 3.5 Transcribe)
-│       └── speechSynthesisService.ts   # Dual TTS (Web Speech API + Gemini 3.8 Flash Lite TTS)
+│   │   └── mockJarvisApi.ts     # Disambiguated mock fallback engine
+│   └── store/
+│       └── jarvisStore.ts       # Zustand store with persistent user settings
 ```
 
 ---
 
-## 2. Server Endpoints
+## 2. Gemini Live Architecture (`gemini-3.8-live`)
 
-All Gemini AI calls execute strictly on the server using `process.env.GEMINI_API_KEY`:
-
-### 2.1 `POST /api/chat`
-- **Purpose**: Generates streaming conversational responses using `gemini-3.8-flash` with minimal thinking and high responsiveness.
-- **Request Headers**: `Content-Type: application/json`
-- **Request Body**:
-  ```json
-  {
-    "messages": [
-      { "role": "user", "text": "What is on my schedule today?" }
-    ],
-    "context": {
-      "userName": "Shreyash",
-      "currentTime": "10/10/2026, 9:15:00 PM",
-      "events": [
-        { "title": "Design review with team", "start": "10:30 AM", "end": "11:30 AM", "location": "Conference Room Alpha" }
-      ],
-      "emails": {
-        "unreadCount": 2,
-        "latest": { "from": "Vedant Shenoy", "subject": "Systems Audit: Microservices Benchmarks" }
-      },
-      "tasks": [
-        { "title": "Verify Mark-VII arc reactor telemetry", "done": true },
-        { "title": "Review pull request #142", "done": false }
-      ],
-      "weather": { "city": "Pune, IN", "tempC": 28, "condition": "Clear Sky", "humidity": 46, "windKph": 12.4 }
-    }
-  }
-  ```
-- **Response**: Server-Sent Events (`text/event-stream; charset=utf-8`) with headers `X-Accel-Buffering: no`, flushing chunks `data: {"delta": "..."}\n\n` followed by `data: [DONE]\n\n`.
-- **System Instruction**: Injects current local IST date and time, user's name, calendar events, unread mail, tasks, and weather into the prompt so Jarvis never hallucinates schedules.
-
-### 2.2 `POST /api/transcribe`
-- **Purpose**: Audio speech recognition for environments without browser Web Speech API.
-- **Model**: `gemini-3.5-transcribe`
-- **Request Body**:
-  ```json
-  {
-    "audioData": "<base64 encoded audio>",
-    "mimeType": "audio/webm"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "transcript": "Transcribed user words"
-  }
-  ```
-
-### 2.3 `POST /api/tts`
-- **Purpose**: Server-side speech generation for natural British assistant voice.
-- **Model**: `gemini-3.8-flash-lite-tts`
-- **Request Body**:
-  ```json
-  {
-    "text": "Good morning, sir. All systems nominal.",
-    "voice": "Kore"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "audio": "<base64 encoded WAV audio>",
-    "format": "audio/wav"
-  }
-  ```
+### Flow:
+1. **Microphone Capture**:
+   - `navigator.mediaDevices.getUserMedia` with `echoCancellation: true`, `noiseSuppression: true`, and `autoGainControl: true`.
+   - Captured in an `AudioWorklet` (`/public/pcm-recorder-processor.js`), converting chunks to raw 16 kHz, 16-bit little-endian PCM.
+   - Streamed over secure WebSocket to `/api/live`.
+2. **Server-Side WebSocket Proxy (`/server/liveProxy.ts`)**:
+   - Maintains a secure server-side session via `@google/genai` `ai.live.connect` with `model: "gemini-3.8-live"`.
+   - `responseModalities: [Modality.AUDIO]`.
+   - Voice personas: `"Charon"` (default deep British male), `"Orus"`, `"Fenrir"`.
+   - Bidirectional audio transcription: `inputAudioTranscription: {}` and `outputAudioTranscription: {}`.
+   - System instruction integrates live dashboard context (Asia/Kolkata date/time, agenda, emails, tasks, weather) and the **Honesty Rule**.
+3. **Low-Latency Gapless Audio Playback**:
+   - Incoming chunks arrive at 24 kHz 16-bit PCM.
+   - Converted to Float32 AudioBuffers and scheduled gaplessly using `AudioBufferSourceNode.start(nextStartTime)`.
+   - Channeled through an `AnalyserNode` and Web Audio filter chain (high-shelf EQ boost, 25ms slap delay, reverb wet mix) scaled by the Effect Amount slider.
+   - Live frequency output directly drives the Arc Reactor Orb pulsing rings.
+4. **Barge-In (Interruption)**:
+   - When Gemini Live detects the user speaking during model audio output, it emits `interrupted: true`.
+   - `geminiLiveService.interruptPlayback()` immediately stops all active source nodes and clears the buffer queue, snapping the orb back to `listening`.
+   - Pressing **Esc** immediately halts Jarvis playback while keeping the Live session open.
 
 ---
 
-## 3. Settings Keys (`jarvis_hud_settings_v1`)
+## 3. Strict Honesty Rule
 
-User preferences are persisted in `localStorage` under key `jarvis_hud_settings_v1`:
+Enforced across **both** Gemini Live and `/api/chat`:
 
-```json
-{
-  "profile": {
-    "userName": "Shreyash"
-  },
-  "voice": {
-    "selectedVoice": "Paul (En-GB) - Sophisticated Butler",
-    "speechRate": 1.05,
-    "wakeWordEnabled": false,
-    "speechEngine": "browser",
-    "voiceEngine": "browser"
-  },
-  "appearance": {
-    "accentColor": "cyan",
-    "reduceMotion": false,
-    "showParticles": true
-  },
-  "sound": {
-    "sfxEnabled": false,
-    "volume: 0.35
-  },
-  "safety": {
-    "confirmMessaging": true,
-    "confirmDeletion": true,
-    "confirmSpending": true
-  }
-}
-```
+> "You currently cannot perform actions: you cannot set reminders or alarms, send emails or messages, edit the calendar, open apps, play music, or control any device. If asked, say plainly and politely that this ability is not connected yet, and offer what you can do right now (answer from the dashboard data, explain, plan, or draft text the user can copy). Never say or imply that you will remind, have noted, have sent, or have done anything. Only claim an action if a tool result confirms it. Never invent events, times or facts that are not in the data."
 
-- **`profile.userName`**: Used by Jarvis in conversations and context injection (default: `"Shreyash"`).
-- **`voice.speechEngine`**: `"browser"` (Web Speech API) or `"gemini"` (`/api/transcribe`).
-- **`voice.voiceEngine`**: `"browser"` (Web Speech Synthesis) or `"gemini"` (`/api/tts`).
-- **`appearance.accentColor`**: Active HUD accent (`"cyan"`, `"blue"`, `"amber"`, `"green"`, `"violet"`).
-- **`appearance.reduceMotion`**: Disables parallax and background rotation.
+---
+
+## 4. UI Fixes & Lifecycle Guarantees
+
+1. **Ghost STANDBY Removed**:
+   - `CinematicCaptions` completely hides placeholder elements when no transcript is active (`opacity-0`), preventing faint duplicate labels.
+2. **Glass Pill Tooltips**:
+   - All interactive controls (Hero Orb canvas, microphone, mute, send, abort, app icons, top bar buttons) now use `GlassTooltip` or explicit glass styling with dark semi-transparent backdrops (`bg-[#071322]/90`) and smooth drop-shadows, eliminating native black browser rectangles.
+3. **Synchronized Caption Lifecycle**:
+   - Starting a new turn (speech or typing) clears previous subtitles within 200ms.
+   - Captions remain visible throughout audio playback.
+   - Captions auto-fade 6 seconds after audio playback concludes.
+
+---
+
+## 5. Antigravity Phase Transition Checklist
+
+In the next phase (Antigravity real tool integration), the following must be connected:
+1. **Google Workspace OAuth & Real APIs**:
+   - Google Calendar API: replace static calendar events with live user Google Calendar sync.
+   - Gmail API: replace mock inbox with real read/search and draft composition.
+   - Google Tasks API: bidirectional task updates.
+2. **Real Tool Calling in Gemini Live**:
+   - Register function declarations (`tools: [{ functionDeclarations: [...] }]`) with `session.sendToolResponse` on `/server/liveProxy.ts` once OAuth tokens are provisioned.
+3. **PC / OS Automation Agent**:
+   - Safe sandbox execution for system vitals, app launching, and local playback controls.

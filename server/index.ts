@@ -34,6 +34,9 @@ app.post("/api/tts", async (req: Request, res: Response) => {
   await handleTtsRequest(req, res);
 });
 
+import http from "http";
+import { setupLiveWebSocketServer } from "./liveProxy";
+
 if (process.env.NODE_ENV === "production") {
   // In production, serve built frontend dist
   app.use(express.static("dist"));
@@ -45,7 +48,9 @@ if (process.env.NODE_ENV === "production") {
 export default app;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  app.listen(PORT, () => {
-    console.log(`JARVIS server online on port ${PORT}`);
+  const server = http.createServer(app);
+  setupLiveWebSocketServer(server);
+  server.listen(PORT, () => {
+    console.log(`JARVIS server online on port ${PORT} with Live WebSocket`);
   });
 }

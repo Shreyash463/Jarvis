@@ -562,7 +562,7 @@ export const ArcReactorOrb: React.FC<ArcReactorOrbProps> = ({
           ref={canvasRef}
           className="relative z-10 h-full w-full cursor-pointer drop-shadow-[0_0_40px_rgba(123,232,255,0.15)]"
           onClick={onToggleMic}
-          title={isListening ? "Click to stop listening" : "Click to speak with J.A.R.V.I.S"}
+          aria-label={isListening ? "Stop voice listening" : "Start speaking with J.A.R.V.I.S"}
         />
       </div>
     </div>

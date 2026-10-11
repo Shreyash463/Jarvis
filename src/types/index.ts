@@ -132,8 +132,9 @@ export interface UserSettings {
     speechRate: number;
     wakeWordEnabled: boolean;
     speechEngine: "browser" | "gemini";
-    voiceEngine: "browser" | "gemini";
-    effectAmount: number; // 0 to 100, default 40
+    voiceEngine: "live" | "browser" | "gemini";
+    liveVoice: "Charon" | "Orus" | "Fenrir" | "Puck" | "Kore" | "Zephyr";
+    effectAmount: number; // 0 to 100, default 30
     isMuted: boolean;
   };
   hearing: {

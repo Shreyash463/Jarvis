@@ -12,6 +12,13 @@ export default defineConfig(() => {
       {
         name: 'api-routes',
         configureServer(server) {
+          if (server.httpServer) {
+            import('./server/liveProxy').then(({ setupLiveWebSocketServer }) => {
+              setupLiveWebSocketServer(server.httpServer);
+            }).catch((err) => {
+              console.error('Failed to attach Live WebSocket server in dev:', err);
+            });
+          }
           server.middlewares.use(express.json({ limit: '25mb' }));
           server.middlewares.use(express.urlencoded({ extended: true }));
           server.middlewares.use(async (req, res, next) => {

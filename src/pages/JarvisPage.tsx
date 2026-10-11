@@ -84,9 +84,12 @@ export const JarvisPage: React.FC = () => {
   const [debugStats, setDebugStats] = useState({
     sendToFirstTokenMs: null as number | null,
     firstTokenToFirstAudioMs: null as number | null,
+    speechEndToAudioMs: null as number | null,
     totalTimeMs: null as number | null,
     speechEngine: currentSettings.voice?.speechEngine || "browser",
-    voiceEngine: currentSettings.voice?.voiceEngine || "browser",
+    voiceEngine: currentSettings.voice?.voiceEngine || "live",
+    liveVoiceName: currentSettings.voice?.liveVoice || "Charon",
+    sessionState: "idle",
     lastError: null as string | null,
   });
 
@@ -111,10 +114,20 @@ export const JarvisPage: React.FC = () => {
         totalTimeMs: telemetry.totalTimeMs,
         lastError: telemetry.lastError,
         speechEngine: speechInput.getSpeechEngine(),
-        voiceEngine: speechService.getVoiceEngine(),
+        voiceEngine: currentSettings.voice?.voiceEngine || "live",
       }));
     };
-  }, []);
+  }, [currentSettings.voice?.voiceEngine]);
+
+  useEffect(() => {
+    setDebugStats((prev) => ({
+      ...prev,
+      voiceEngine: currentSettings.voice?.voiceEngine || "live",
+      liveVoiceName: currentSettings.voice?.liveVoice || "Charon",
+      sessionState: orbState,
+      speechEndToAudioMs: stats.latency || null,
+    }));
+  }, [currentSettings.voice?.voiceEngine, currentSettings.voice?.liveVoice, orbState, stats.latency]);
 
   // Mouse parallax offset state
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
@@ -226,9 +239,10 @@ export const JarvisPage: React.FC = () => {
       setTurnVisible(true);
     }
 
-    // Auto-fade ~8s after Jarvis finishes responding
+    // Auto-fade 6s after Jarvis finishes speaking audio
     if (
       latestAssistantMessage.status === "done" &&
+      orbState !== "speaking" &&
       lastCompletedMsgIdRef.current !== latestAssistantMessage.id
     ) {
       lastCompletedMsgIdRef.current = latestAssistantMessage.id;
@@ -240,10 +254,10 @@ export const JarvisPage: React.FC = () => {
         setTimeout(() => {
           setTurnReplyText("");
           setTurnUserText("");
-        }, 250);
-      }, 8000);
+        }, 200);
+      }, 6000);
     }
-  }, [latestAssistantMessage?.id, latestAssistantMessage?.text, latestAssistantMessage?.status]);
+  }, [latestAssistantMessage?.id, latestAssistantMessage?.text, latestAssistantMessage?.status, orbState]);
 
   const handleStartSpeaking = () => {
     if (fadeOutTimerRef.current !== null) {
