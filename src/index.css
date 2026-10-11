@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --bg-0: #02050c;
+  --bg-1: #070e1c;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(123, 232, 255, 0.35);
+  --cyan: #7be8ff;
+  --cyan-soft: #a8f0ff;
+  --blue: #2f7bff;
+  --amber: #ffb347;
+  --red: #ff5263;
+  --green: #2dffa3;
+  --text-hi: rgba(255, 255, 255, 0.92);
+  --text-mid: rgba(255, 255, 255, 0.55);
+  --text-low: rgba(255, 255, 255, 0.35);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Custom Tactical Scrollbar (Hidden track, thin cyan thumb) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 224, 255, 0.28);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 224, 255, 0.6);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 224, 255, 0.28) transparent;
+}
+
+/* Global Transition Easing */
+* {
+  box-sizing: border-box;
+}
+
+/* Accessible focus ring */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+}
+
+/* Motion reduction compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

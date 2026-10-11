@@ -1,0 +1,6 @@
+{
+  "name": "J.A.R.V.I.S — Holographic AI HUD",
+  "description": "Tactical holographic Iron Man style AI assistant HUD with Arc Reactor core, real-time telemetry, conversational transcript, and workspace integrations.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
